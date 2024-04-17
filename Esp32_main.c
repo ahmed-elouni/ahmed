@@ -57,12 +57,19 @@ void setup() {
 
   // Set MQTT server and port
   mqttClient.setServer(mqttBroker, mqttPort);
+  mqttClient.setCallback(callback);
 
   // Configure ADC for 12-bit resolution (0-4095) for higher precision
   analogReadResolution(12);
 
   // Set relay pin as output
   pinMode(relayPin, OUTPUT);
+
+  // Subscribe to relay control topic
+  String relayTopic = "devices/" + getDeviceId() + "/relay_control";
+  mqttClient.subscribe(relayTopic.c_str());
+  Serial.print("Subscribed to MQTT topic: ");
+  Serial.println(relayTopic);
 }
 
 void loop() {
@@ -96,18 +103,12 @@ void loop() {
     // Check if current or voltage exceeds thresholds
     if (currentAmps > currentThreshold || voltageVolts > voltageThreshold) {
       // Turn on the relay (active LOW)
-      digitalWrite(relayPin, LOW);
-      Serial.println("Relay ON");
-
-      // Publish relay status (ON) to MQTT topic
-      publishToMQTT(deviceId, "relay_status", 1); // Publish 1 (ON) for relay status
+      controlRelay(true); // Turn ON the relay
+      publishToMQTT(deviceId, "relay_status", 1); // Publish relay status (ON)
     } else {
       // Turn off the relay (active LOW)
-      digitalWrite(relayPin, HIGH);
-      Serial.println("Relay OFF");
-
-      // Publish relay status (OFF) to MQTT topic
-      publishToMQTT(deviceId, "relay_status", 0); // Publish 0 (OFF) for relay status
+      controlRelay(false); // Turn OFF the relay
+      publishToMQTT(deviceId, "relay_status", 0); // Publish relay status (OFF)
     }
   }
 }
@@ -145,4 +146,39 @@ void publishToMQTT(const char* deviceId, const char* metricType, float value) {
   Serial.print(topic);
   Serial.print(", Payload: ");
   Serial.println(payload);
+}
+
+void controlRelay(bool state) {
+  // Control the relay based on the desired state (true = ON, false = OFF)
+  digitalWrite(relayPin, state ? LOW : HIGH);
+  Serial.print("Relay ");
+  Serial.println(state ? "ON" : "OFF");
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  // Handle incoming MQTT messages
+  Serial.print("Message received on topic: ");
+  Serial.println(topic);
+
+  // Convert payload to string
+  String message = "";
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+
+  Serial.print("Message payload: ");
+  Serial.println(message);
+
+  // Check if the received topic is the relay control topic
+  String relayTopic = "devices/" + getDeviceId() + "/relay_control";
+  if (String(topic) == relayTopic) {
+    // Check the desired relay state (payload should be "0" for OFF or "1" for ON)
+    if (message == "0") {
+      controlRelay(false); // Turn OFF the relay
+      publishToMQTT(getDeviceId().c_str(), "relay_status", 0); // Publish relay status (OFF)
+    } else if (message == "1") {
+      controlRelay(true); // Turn ON the relay
+      publishToMQTT(getDeviceId().c_str(), "relay_status", 1); // Publish relay status (ON)
+    }
+  }
 }

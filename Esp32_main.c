@@ -1,9 +1,21 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <PubSubClient.h>
 
 // WiFi credentials
 const char* ssid = "YourWiFiSSID";     // Replace with your WiFi network SSID
 const char* password = "YourWiFiPassword"; // Replace with your WiFi network password
+
+// MQTT Broker (Server) configuration
+const char* mqttBroker = "mqtt.example.com"; // MQTT Broker address
+const int mqttPort = 1883;                    // MQTT Broker port
+
+// MQTT topic for publishing data
+const char* mqttTopic = "sensor/data";       // MQTT topic to publish data
+
+// MQTT client instance
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
 
 // Define analog input pins for current and voltage measurements
 const int currentSensorPin = 34;   // Analog input pin for current sensor
@@ -33,11 +45,20 @@ void setup() {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
+  // Set MQTT server and port
+  mqttClient.setServer(mqttBroker, mqttPort);
+
   // Configure ADC for 12-bit resolution (0-4095) for higher precision
   analogReadResolution(12);
 }
 
 void loop() {
+  if (!mqttClient.connected()) {
+    reconnectMQTT();
+  }
+
+  mqttClient.loop();
+
   static unsigned long lastMeasurementTime = 0;
 
   // Check if it's time to take a new measurement
@@ -52,13 +73,32 @@ void loop() {
     float currentAmps = map(currentRawValue, 0, 4095, 0, 30) / 1000.0; // Example: Map 0-4095 to 0-30 Amps
     float voltageVolts = map(voltageRawValue, 0, 4095, 0, 3300) / 1000.0; // Example: Map 0-4095 to 0-3.3 Volts
 
-    // Print current and voltage readings
-    Serial.print("Current: ");
-    Serial.print(currentAmps, 3); // Print current value with 3 decimal places
-    Serial.print(" A, Voltage: ");
-    Serial.print(voltageVolts, 2); // Print voltage value with 2 decimal places
-    Serial.println(" V");
-  }
+    // Create payload with current and voltage data
+    String payload = String(currentAmps) + "," + String(voltageVolts);
 
-  // Add any other code that needs to run continuously here
+    // Publish payload to MQTT topic
+    mqttClient.publish(mqttTopic, payload.c_str());
+
+    Serial.println("Published to MQTT:");
+    Serial.println(payload);
+  }
+}
+
+void reconnectMQTT() {
+  // Loop until we're reconnected
+  while (!mqttClient.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    
+    // Attempt to connect
+    if (mqttClient.connect("ESP32Client")) {
+      Serial.println("Connected to MQTT Broker");
+    } else {
+      Serial.print("Failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" Retrying in 5 seconds...");
+      
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
 }

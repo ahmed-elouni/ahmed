@@ -98,10 +98,16 @@ void loop() {
       // Turn on the relay (active LOW)
       digitalWrite(relayPin, LOW);
       Serial.println("Relay ON");
+
+      // Publish relay status (ON) to MQTT topic
+      publishToMQTT(deviceId, "relay_status", 1); // Publish 1 (ON) for relay status
     } else {
       // Turn off the relay (active LOW)
       digitalWrite(relayPin, HIGH);
       Serial.println("Relay OFF");
+
+      // Publish relay status (OFF) to MQTT topic
+      publishToMQTT(deviceId, "relay_status", 0); // Publish 0 (OFF) for relay status
     }
   }
 }

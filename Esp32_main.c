@@ -18,11 +18,21 @@ PubSubClient mqttClient(espClient);
 const int currentSensorPin = 34;   // Analog input pin for current sensor
 const int voltageSensorPin = 35;   // Analog input pin for voltage sensor
 
+// Define relay pin
+const int relayPin = 26;  // GPIO pin connected to the relay control
+
 // Define measurement interval (in milliseconds)
 const unsigned long measurementInterval = 5000; // Interval of 5 seconds
 
-// Device ID (replace with unique identifier for your device)
-const char* deviceId = "esp32_device1";  // Example device ID
+// Thresholds for current and voltage (in Amps and Volts)
+const float currentThreshold = 0.5;  // Threshold current (in Amps) to trigger the relay
+const float voltageThreshold = 2.0;  // Threshold voltage (in Volts) to trigger the relay
+
+// Function to get unique device ID based on ESP32 chip ID
+String getDeviceId() {
+  uint64_t chipId = ESP.getEfuseMac(); // Get ESP32 chip ID
+  return String(chipId, HEX); // Convert chip ID to hexadecimal string
+}
 
 void setup() {
   Serial.begin(115200); // Initialize serial communication
@@ -50,6 +60,9 @@ void setup() {
 
   // Configure ADC for 12-bit resolution (0-4095) for higher precision
   analogReadResolution(12);
+
+  // Set relay pin as output
+  pinMode(relayPin, OUTPUT);
 }
 
 void loop() {
@@ -73,9 +86,23 @@ void loop() {
     float currentAmps = map(currentRawValue, 0, 4095, 0, 30) / 1000.0; // Example: Map 0-4095 to 0-30 Amps
     float voltageVolts = map(voltageRawValue, 0, 4095, 0, 3300) / 1000.0; // Example: Map 0-4095 to 0-3.3 Volts
 
+    // Get unique device ID (ESP32 chip ID)
+    String deviceId = getDeviceId();
+
     // Publish current and voltage data to MQTT topics
     publishToMQTT(deviceId, "current", currentAmps);
     publishToMQTT(deviceId, "voltage", voltageVolts);
+
+    // Check if current or voltage exceeds thresholds
+    if (currentAmps > currentThreshold || voltageVolts > voltageThreshold) {
+      // Turn on the relay (active LOW)
+      digitalWrite(relayPin, LOW);
+      Serial.println("Relay ON");
+    } else {
+      // Turn off the relay (active LOW)
+      digitalWrite(relayPin, HIGH);
+      Serial.println("Relay OFF");
+    }
   }
 }
 
@@ -85,7 +112,7 @@ void reconnectMQTT() {
     Serial.print("Attempting MQTT connection...");
     
     // Attempt to connect
-    if (mqttClient.connect(deviceId)) {
+    if (mqttClient.connect(getDeviceId().c_str())) {
       Serial.println("Connected to MQTT Broker");
     } else {
       Serial.print("Failed, rc=");

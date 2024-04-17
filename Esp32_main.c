@@ -10,9 +10,6 @@ const char* password = "YourWiFiPassword"; // Replace with your WiFi network pas
 const char* mqttBroker = "mqtt.example.com"; // MQTT Broker address
 const int mqttPort = 1883;                    // MQTT Broker port
 
-// MQTT topic for publishing data
-const char* mqttTopic = "sensor/data";       // MQTT topic to publish data
-
 // MQTT client instance
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
@@ -23,6 +20,9 @@ const int voltageSensorPin = 35;   // Analog input pin for voltage sensor
 
 // Define measurement interval (in milliseconds)
 const unsigned long measurementInterval = 5000; // Interval of 5 seconds
+
+// Device ID (replace with unique identifier for your device)
+const char* deviceId = "esp32_device1";  // Example device ID
 
 void setup() {
   Serial.begin(115200); // Initialize serial communication
@@ -73,14 +73,9 @@ void loop() {
     float currentAmps = map(currentRawValue, 0, 4095, 0, 30) / 1000.0; // Example: Map 0-4095 to 0-30 Amps
     float voltageVolts = map(voltageRawValue, 0, 4095, 0, 3300) / 1000.0; // Example: Map 0-4095 to 0-3.3 Volts
 
-    // Create payload with current and voltage data
-    String payload = String(currentAmps) + "," + String(voltageVolts);
-
-    // Publish payload to MQTT topic
-    mqttClient.publish(mqttTopic, payload.c_str());
-
-    Serial.println("Published to MQTT:");
-    Serial.println(payload);
+    // Publish current and voltage data to MQTT topics
+    publishToMQTT(deviceId, "current", currentAmps);
+    publishToMQTT(deviceId, "voltage", voltageVolts);
   }
 }
 
@@ -90,7 +85,7 @@ void reconnectMQTT() {
     Serial.print("Attempting MQTT connection...");
     
     // Attempt to connect
-    if (mqttClient.connect("ESP32Client")) {
+    if (mqttClient.connect(deviceId)) {
       Serial.println("Connected to MQTT Broker");
     } else {
       Serial.print("Failed, rc=");
@@ -101,4 +96,20 @@ void reconnectMQTT() {
       delay(5000);
     }
   }
+}
+
+void publishToMQTT(const char* deviceId, const char* metricType, float value) {
+  // Construct MQTT topic based on device ID and metric type
+  String topic = "devices/" + String(deviceId) + "/" + String(metricType);
+
+  // Convert float value to string for MQTT payload
+  String payload = String(value, 2); // 2 decimal places
+
+  // Publish payload to MQTT topic
+  mqttClient.publish(topic.c_str(), payload.c_str());
+
+  Serial.print("Published to MQTT - Topic: ");
+  Serial.print(topic);
+  Serial.print(", Payload: ");
+  Serial.println(payload);
 }

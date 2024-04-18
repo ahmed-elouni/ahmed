@@ -1,0 +1,4 @@
+Install paho-mqtt Python Library
+Ensure you have the paho-mqtt library installed on your Raspberry Pi. You can install it using pip if it's not already installed:
+
+pip install paho-mqtt

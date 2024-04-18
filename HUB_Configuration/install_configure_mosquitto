@@ -1,0 +1,11 @@
+1]
+Install Mosquitto: Install the Mosquitto MQTT broker and command-line tools on your Raspberry Pi:
+
+sudo apt update
+sudo apt install mosquitto mosquitto-clients
+
+2]
+Start and Enable Mosquitto Service: The Mosquitto service should start automatically after installation. You can start or restart the service using:
+
+sudo systemctl start mosquitto
+sudo systemctl enable mosquitto
